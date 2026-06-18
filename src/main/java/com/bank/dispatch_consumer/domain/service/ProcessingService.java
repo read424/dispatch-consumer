@@ -1,5 +1,6 @@
 package com.bank.dispatch_consumer.domain.service;
 
+import com.bank.dispatch_consumer.domain.dto.SnapshotDto;
 import com.bank.dispatch_consumer.domain.entity.CardReplacementEntity;
 import com.bank.dispatch_consumer.domain.mapper.EntityMapper;
 import com.bank.events.CardReplacementEvent;
@@ -208,7 +209,11 @@ public class ProcessingService {
      */
     private void persistSnapshotToRedis(CardReplacementEvent ev, String requestId, String status, int attemptNumber, EventMessage<CardReplacementEvent> msg, Timer.Sample sample) {
         try {
-            String snapshotJson = objectMapper.writeValueAsString(ev);
+            SnapshotDto snapshot = SnapshotDto.fromAvroEvent(ev);
+            // Actualizar status y attemptNumber con los valores del intento actual
+            snapshot.setStatus(status);
+            snapshot.setAttemptNumber(attemptNumber);
+            String snapshotJson = objectMapper.writeValueAsString(snapshot);
             snapshotCacheRepository.saveSnapshotJson(requestId, snapshotJson).subscribe(
                     () -> {
                         eventsOk.increment();
@@ -236,8 +241,19 @@ public class ProcessingService {
     private void applySnapshot(CardReplacementEvent ev, String snapshotJson){
         if (snapshotJson == null) return;
         try {
-            // readerForUpdating sobrescribe los campos presentes en snapshotJson en ev
-            objectMapper.readerForUpdating(ev).readValue(snapshotJson);
+            SnapshotDto snapshot = objectMapper.readValue(snapshotJson, SnapshotDto.class);
+            if (snapshot.getEventId() != null) ev.setEventId(snapshot.getEventId());
+            if (snapshot.getRequestId() != null) ev.setRequestId(snapshot.getRequestId());
+            if (snapshot.getCustomerId() != null) ev.setCustomerId(snapshot.getCustomerId());
+            if (snapshot.getCardPANMasked() != null) ev.setCardPANMasked(snapshot.getCardPANMasked());
+            if (snapshot.getReasonCode() != null) ev.setReasonCode(snapshot.getReasonCode());
+            if (snapshot.getPriority() != null) ev.setPriority(snapshot.getPriority());
+            if (snapshot.getBranchCode() != null) ev.setBranchCode(snapshot.getBranchCode());
+            if (snapshot.getDeliveryAddress() != null) ev.setDeliveryAddress(snapshot.getDeliveryAddress());
+            if (snapshot.getRequestedAt() != null) ev.setRequestedAt(snapshot.getRequestedAt());
+            if (snapshot.getAttemptNumber() != null) ev.setAttemptNumber(snapshot.getAttemptNumber());
+            if (snapshot.getCorrelationId() != null) ev.setCorrelationId(snapshot.getCorrelationId());
+            if (snapshot.getStatus() != null) ev.setStatus(snapshot.getStatus());
             log.debug("Snapshot aplicado correctamente a evento");
         } catch (Exception e){
             log.warn("Fallo al mezclar snapshot en evento (requestId={}): {}", ev.getRequestId(), e.toString());
