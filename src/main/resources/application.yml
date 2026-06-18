@@ -1,0 +1,34 @@
+server:
+  port: 8086   # puerto HTTP del dispatch-consumer
+
+spring:
+  application:
+    name: dispatch-consumer
+  data:
+    mongodb:
+      uri: ${MONGO_URI:mongodb://localhost:27017/cardsdb}
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+
+logging:
+  level:
+    root: INFO
+    com.bank.dispatch_consumer: DEBUG
+    org.springframework.data.mongodb: INFO
+    reactor.kafka: INFO
+
+health:
+  show-details: always
+metrics:
+  tags:
+    application: ${spring.application.name}
+
+app:
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    group-id: dispatch-consumer
+    schema-registry-url: ${SCHEMA_REGISTRY_URL:http://localhost:8081}
+  topics:
+    main: bank.card.replacements.v1
+    dlt: bank.card.replacements.v1.DLT
